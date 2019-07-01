@@ -1,7 +1,8 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::sync::Arc;
 pub struct Engine {
-    pub functions: HashMap<FnSpec, FnIntExt>,
+    pub functions: HashMap<FnSpec, Arc<FnIntExt>>,
     pub types: HashMap<TypeId, String>,
 }
 
@@ -30,13 +31,18 @@ impl Engine {
         return engine;
     }
 
-    pub fn call_fn(&self, ident: String, args: Vec<&mut Any>) -> Result<(), ()> {
-        let function = FnSpec {
+    pub fn call_fn(&self, ident: String, args: Vec<&mut Any>) -> Result<Box<Any>, ()> {
+        let spec = FnSpec {
             id: ident.clone(),
             args: Some(args.iter().map(|a| <Any as Any>::type_id(&**a)).collect()),
         };
-
-        return Ok(());
+		self.functions.get(&spec)
+			.ok_or(())
+			.and_then(move |f| match **f{
+				FnIntExt::Ext(ref f) => f(args),
+				//FnIntExt::Int(ref f) => (),
+			});
+        return Ok(Box::new(0));
     }
 
     pub fn register_fn<P, Q, R, FN, RET>(&mut self, name: &str, f: FN)
@@ -68,6 +74,6 @@ impl Engine {
     pub fn register_fn_raw(&mut self, ident: String, args: Option<Vec<TypeId>>, f: Box<FnAny>) {
         let spec = FnSpec { id: ident, args };
 
-        self.functions.insert(spec, FnIntExt::Ext(f));
+        self.functions.insert(spec, Arc::new(FnIntExt::Ext(f)));
     }
 }
