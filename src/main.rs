@@ -1,5 +1,6 @@
 mod module;
 use module::engine::*;
+use std::env;
 
 fn main() {
     let mut engine_vm = Engine::new();
@@ -8,6 +9,10 @@ fn main() {
     let (mut a, mut b, mut c) = (1, 2, 3);
     engine_vm.call_fn("test".to_string(), vec![&mut a, &mut b, &mut c]);
     println!("Hello, world!");
+
+    for fname in env::args().skip(1) {
+        println!("fname {}",fname);
+    }
 }
 
 fn test_fn(a: i32, b: i32, c: i32) {
