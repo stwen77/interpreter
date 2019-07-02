@@ -11,7 +11,7 @@ fn main() {
     println!("Hello, world!");
 
     for fname in env::args().skip(1) {
-        println!("fname {}",fname);
+        println!("fname {}", fname);
     }
 }
 

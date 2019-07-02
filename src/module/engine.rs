@@ -1,4 +1,4 @@
-use super::parser::Expr;
+use super::parser::{parse, Expr};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -81,8 +81,28 @@ impl Engine {
     pub fn evaluate_express(&self, expr: &Expr) -> Result<Box<Any>, ()> {
         let mut testv = 0;
         match *expr {
-            Expr::FnCall(ref fn_name, ref args) => self.call_fn(fn_name.to_owned(), vec![&mut testv]),
+            Expr::FnCall(ref fn_name, ref args) => {
+                self.call_fn(fn_name.to_owned(), vec![&mut testv])
+            }
             _ => Err(()),
         }
+    }
+    pub fn eval_file<T>(&mut self, fname: &str) -> Result<T, ()> {
+        use std::fs::File;
+        use std::io::prelude::*;
+        if let Ok(mut f) = File::open(fname) {
+            let mut contents = String::new();
+
+            if f.read_to_string(&mut contents).is_ok() {
+                Err(())
+            } else {
+                Err(())
+            }
+        } else {
+            Err(())
+        }
+    }
+    pub fn eval<T>(&mut self, input: &str) -> Result<T, ()> {
+        Err(())
     }
 }
