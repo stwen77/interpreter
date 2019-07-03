@@ -1,12 +1,11 @@
-
-use std::str::Chars;
 use std::iter::Peekable;
+use std::str::Chars;
 
 #[derive(Debug, Clone)]
-pub struct FnDef{
-    pub name : String,
+pub struct FnDef {
+    pub name: String,
     pub params: Vec<String>,
-    pub body:Box<Statment>,
+    pub body: Box<Statment>,
 }
 
 #[derive(Debug, Clone)]
@@ -108,21 +107,22 @@ pub fn parse(input: &mut str) {
     //let mut statement = Vec::new();
     //let mut fn_def = Vec::new();
 
-
-    let mut last_token:Token = Token::Nothing;
-    let mut input_iter = input.chars().peekable();
-    while let Some(_) = input_iter.peek(){
-        match last_token {
+    let mut token_iterator = TokenIterator::new(input);
+    while let Some(_) = token_iterator.char_stream.peek() {
+        match token_iterator.last {
             Token::Fn => (),
-            _ => {parse_statement(&mut input_iter, &mut last_token);},
+            _ => {
+                parse_statement(&mut token_iterator);
+            }
         }
-        input_iter.next();
-        
+        token_iterator.char_stream.next();
     }
     println!("");
 }
-pub fn parse_statement(input: &mut Peekable<Chars<>>, last_token:&mut Token)->Result<Statment, ()>{
-    match last_token {
+pub fn parse_statement(
+    input: &mut TokenIterator
+) -> Result<Statment, ()> {
+    match input.last {
         Token::If => Err(()),
         Token::While => Err(()),
         Token::Loop => Err(()),
@@ -133,9 +133,22 @@ pub fn parse_statement(input: &mut Peekable<Chars<>>, last_token:&mut Token)->Re
         _ => Err(()),
     }
 }
-fn parse_var(input: &mut Peekable<Chars<>>, last_token:&mut Token){
-
+fn parse_var<'a>(input: &mut Peekable<Chars<'a>>, last_token: &mut Token) {}
+pub struct TokenIterator<'a>{
+    last: Token,
+    char_stream: Peekable<Chars<'a>>,
 }
-fn next_token(input: &mut Peekable<Chars<>>, last_token:&mut Token){
-    
+impl<'a> TokenIterator<'a> {
+    fn new(input: &'a str) -> Self{
+        TokenIterator{
+            last: Token::Nothing,
+            char_stream: input.chars().peekable(),
+        }
+    }
+    fn next_token(&mut self, input: &mut Peekable<Chars>) {
+
+    }
+    fn inner_next(&mut self, input: &mut Peekable<Chars>) {
+        
+    }
 }
