@@ -37,6 +37,7 @@ pub enum Expr {
     True,
     False,
     Unit,
+    TempStub,
 }
 
 #[derive(Debug, Clone)]
@@ -131,7 +132,52 @@ pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
         _ => Err(()),
     }
 }
-fn parse_var<'a>(input: &mut Peekable<Chars<'a>>, last_token: &mut Token) {}
+fn parse_var<'a>(input: &mut Peekable<Chars<'a>>) {}
+fn parse_express_statement<'a>(input: &mut TokenIterator<'a>){
+    let express = match input.last {
+        Token::RParen => Expr::Unit,
+        _ => {
+            let lhs = parse_unary(input).unwrap();
+
+            Expr::TempStub
+        }
+    };
+}
+fn parse_unary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
+    let tok = input.last.clone();
+
+    match tok {
+        Token::UnaryMinus => { input.next(); Ok(Expr::FnCall("-".to_string(), vec![parse_primary(input)?])) }
+        Token::UnaryPlus => { input.next(); parse_primary(input) }
+        Token::Bang => { input.next(); Ok(Expr::FnCall("!".to_string(), vec![parse_primary(input)?])) }
+        _ => parse_primary(input)
+    }
+}
+fn parse_primary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
+    if let Some(token) = input.next() {
+        match token {
+            Token::IntConst(ref x) => Ok(Expr::IntConst(*x)),
+            Token::FloatConst(ref x) => Ok(Expr::FloatConst(*x)),
+            Token::StringConst(ref s) => Ok(Expr::StringConst(s.clone())),
+            Token::CharConst(ref c) => Ok(Expr::CharConst(*c)),
+            //Token::Identifier(ref s) => parse_ident_expr,
+            //Token::LParen => parse_paren_expr,
+            //Token::LSquare => parse_array_expr,
+            Token::True => Ok(Expr::True),
+            Token::False => Ok(Expr::False),
+            Token::LexErr => {
+                println!("Error: primary");
+                Err(())
+            }
+            _ => {
+                println!("Can't parse: {:?}", token);
+                Err(())
+            }
+        }
+    } else {
+        Err(())
+    }
+}
 pub struct TokenIterator<'a> {
     last: Token,
     char_stream: Peekable<Chars<'a>>,
@@ -143,12 +189,13 @@ impl<'a> TokenIterator<'a> {
             char_stream: input.chars().peekable(),
         }
     }
-    fn next(&mut self) {
+    fn next(&mut self) -> Option<Token>{
         self.last =  match self.inner_next() {
             Some(c) => c,
             None => Token::Nothing,
         };
 
+        Some(self.last.clone())
     }
     fn inner_next(&mut self) -> Option<Token> {
         while let Some(c) = self.char_stream.next() {
