@@ -1,4 +1,6 @@
 
+use std::str::Chars;
+use std::iter::Peekable;
 
 #[derive(Debug, Clone)]
 pub struct FnDef{
@@ -99,17 +101,41 @@ pub enum Token {
     ModuloAssign,
     PowerOf,
     PowerOfAssign,
+    Nothing,
     LexErr,
 }
 pub fn parse(input: &mut str) {
     //let mut statement = Vec::new();
     //let mut fn_def = Vec::new();
 
+
+    let mut last_token:Token = Token::Nothing;
     let mut input_iter = input.chars().peekable();
-    while let Some(a) = input_iter.peek(){
-        print!("{}",a);
+    while let Some(_) = input_iter.peek(){
+        match last_token {
+            Token::Fn => (),
+            _ => {parse_statement(&mut input_iter, &mut last_token);},
+        }
         input_iter.next();
         
     }
     println!("");
+}
+pub fn parse_statement(input: &mut Peekable<Chars<>>, last_token:&mut Token)->Result<Statment, ()>{
+    match last_token {
+        Token::If => Err(()),
+        Token::While => Err(()),
+        Token::Loop => Err(()),
+        Token::Break => Err(()),
+        Token::Return => Err(()),
+        Token::LCurly => Err(()),
+        Token::Var => Err(()),
+        _ => Err(()),
+    }
+}
+fn parse_var(input: &mut Peekable<Chars<>>, last_token:&mut Token){
+
+}
+fn next_token(input: &mut Peekable<Chars<>>, last_token:&mut Token){
+    
 }
