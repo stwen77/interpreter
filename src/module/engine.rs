@@ -94,6 +94,7 @@ impl Engine {
             let mut contents = String::new();
 
             if f.read_to_string(&mut contents).is_ok() {
+                self.eval::<T>(&mut contents);
                 Err(())
             } else {
                 Err(())
@@ -102,7 +103,8 @@ impl Engine {
             Err(())
         }
     }
-    pub fn eval<T>(&mut self, input: &str) -> Result<T, ()> {
+    pub fn eval<T>(&mut self, input: &mut str) -> Result<T, ()> {
+        parse(input);
         Err(())
     }
 }

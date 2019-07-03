@@ -105,4 +105,11 @@ pub fn parse(input: &mut str) {
     //let mut statement = Vec::new();
     //let mut fn_def = Vec::new();
 
+    let mut input_iter = input.chars().peekable();
+    while let Some(a) = input_iter.peek(){
+        print!("{}",a);
+        input_iter.next();
+        
+    }
+    println!("");
 }
