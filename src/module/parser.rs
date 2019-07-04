@@ -129,28 +129,39 @@ pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
         Token::Return => Err(()),
         Token::LCurly => Err(()),
         Token::Var => Err(()),
-        _ => Err(()),
+        _ => parse_express_statement(input),
     }
 }
 fn parse_var<'a>(input: &mut Peekable<Chars<'a>>) {}
-fn parse_express_statement<'a>(input: &mut TokenIterator<'a>){
+fn parse_express_statement<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
     let express = match input.last {
         Token::RParen => Expr::Unit,
         _ => {
-            let lhs = parse_unary(input).unwrap();
-
+            if let Expr::IntConst(lhs) = parse_unary(input).unwrap_or(Expr::IntConst(0)) {
+                println!("lhs{}", lhs);
+            }
             Expr::TempStub
         }
     };
+    Ok(Statment::Expr(Box::new(express)))
 }
 fn parse_unary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
     let tok = input.last.clone();
 
     match tok {
-        Token::UnaryMinus => { input.next(); Ok(Expr::FnCall("-".to_string(), vec![parse_primary(input)?])) }
-        Token::UnaryPlus => { input.next(); parse_primary(input) }
-        Token::Bang => { input.next(); Ok(Expr::FnCall("!".to_string(), vec![parse_primary(input)?])) }
-        _ => parse_primary(input)
+        Token::UnaryMinus => {
+            input.next();
+            Ok(Expr::FnCall("-".to_string(), vec![parse_primary(input)?]))
+        }
+        Token::UnaryPlus => {
+            input.next();
+            parse_primary(input)
+        }
+        Token::Bang => {
+            input.next();
+            Ok(Expr::FnCall("!".to_string(), vec![parse_primary(input)?]))
+        }
+        _ => parse_primary(input),
     }
 }
 fn parse_primary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
@@ -189,8 +200,8 @@ impl<'a> TokenIterator<'a> {
             char_stream: input.chars().peekable(),
         }
     }
-    fn next(&mut self) -> Option<Token>{
-        self.last =  match self.inner_next() {
+    fn next(&mut self) -> Option<Token> {
+        self.last = match self.inner_next() {
             Some(c) => c,
             None => Token::Nothing,
         };
@@ -228,7 +239,7 @@ impl<'a> TokenIterator<'a> {
                         }
                     }
 
-                    let out:String = result.into_iter().collect();
+                    let out: String = result.into_iter().collect();
                     if let Ok(val) = out.parse::<i64>() {
                         println!("{}", val);
                         return Some(Token::IntConst(val));
