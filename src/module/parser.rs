@@ -137,13 +137,184 @@ fn parse_express_statement<'a>(input: &mut TokenIterator<'a>) -> Result<Statment
     let express = match input.last {
         Token::RParen => Expr::Unit,
         _ => {
-            if let Expr::IntConst(lhs) = parse_unary(input).unwrap_or(Expr::IntConst(0)) {
-                println!("lhs{}", lhs);
-            }
-            Expr::TempStub
+            let lhs = parse_unary(input).unwrap_or(Expr::IntConst(0));
+            parse_binary_operation(input, 0, lhs).unwrap()
         }
     };
+    println!("expr res {:?}", express);
     Ok(Statment::Expr(Box::new(express)))
+}
+fn parse_binary_operation<'a>(input: &mut TokenIterator<'a>, prec: i32, lhs: Expr) -> Result<Expr, ()> {
+    let mut lhs_curr = lhs;
+
+    loop {
+        let mut curr_prec = -1;
+
+        if let curr_op = input.last.clone() {
+            curr_prec = get_precedence(&curr_op);
+        }
+
+        if curr_prec < prec {
+            return Ok(lhs_curr);
+        }
+
+        if let Some(op_token) = input.next() {
+            let mut rhs = r#try!(parse_unary(input));
+
+            let mut next_prec = -1;
+
+            if let next_op = input.last.clone() {
+                //next_prec = get_precedence(next_op);
+            }
+
+            if curr_prec < next_prec {
+                rhs = r#try!(parse_binary_operation(input, curr_prec + 1, rhs));
+            } else if curr_prec >= 100 {
+                // Always bind right to left for precedence over 100
+                rhs = r#try!(parse_binary_operation(input, curr_prec, rhs));
+            }
+
+            lhs_curr = match op_token {
+                Token::Plus => Expr::FnCall("+".to_string(), vec![lhs_curr, rhs]),
+                Token::Minus => Expr::FnCall("-".to_string(), vec![lhs_curr, rhs]),
+                Token::Multiply => Expr::FnCall("*".to_string(), vec![lhs_curr, rhs]),
+                Token::Divide => Expr::FnCall("/".to_string(), vec![lhs_curr, rhs]),
+                Token::Equals => Expr::Assignment(Box::new(lhs_curr), Box::new(rhs)),
+                Token::PlusAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall("+".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                Token::MinusAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall("-".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                Token::Period => Expr::Dot(Box::new(lhs_curr), Box::new(rhs)),
+                Token::EqualTo => Expr::FnCall("==".to_string(), vec![lhs_curr, rhs]),
+                Token::NotEqualTo => Expr::FnCall("!=".to_string(), vec![lhs_curr, rhs]),
+                Token::LessThan => Expr::FnCall("<".to_string(), vec![lhs_curr, rhs]),
+                Token::LessThanEqual => Expr::FnCall("<=".to_string(), vec![lhs_curr, rhs]),
+                Token::GreaterThan => Expr::FnCall(">".to_string(), vec![lhs_curr, rhs]),
+                Token::GreaterThanEqual => Expr::FnCall(">=".to_string(), vec![lhs_curr, rhs]),
+                Token::Or => Expr::FnCall("||".to_string(), vec![lhs_curr, rhs]),
+                Token::And => Expr::FnCall("&&".to_string(), vec![lhs_curr, rhs]),
+                Token::XOr => Expr::FnCall("^".to_string(), vec![lhs_curr, rhs]),
+                Token::OrAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall("|".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                Token::AndAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall("&".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                Token::XOrAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall("^".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                Token::MultiplyAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall("*".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                Token::DivideAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall("/".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                Token::Pipe => Expr::FnCall("|".to_string(), vec![lhs_curr, rhs]),
+                Token::LeftShift => Expr::FnCall("<<".to_string(), vec![lhs_curr, rhs]),
+                Token::RightShift => Expr::FnCall(">>".to_string(), vec![lhs_curr, rhs]),
+                Token::LeftShiftAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall("<<".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                Token::RightShiftAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall(">>".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                Token::Ampersand => Expr::FnCall("&".to_string(), vec![lhs_curr, rhs]),
+                Token::Modulo => Expr::FnCall("%".to_string(), vec![lhs_curr, rhs]),
+                Token::ModuloAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall("%".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                Token::PowerOf => Expr::FnCall("~".to_string(), vec![lhs_curr, rhs]),
+                Token::PowerOfAssign => {
+                    let lhs_copy = lhs_curr.clone();
+                    Expr::Assignment(
+                        Box::new(lhs_curr),
+                        Box::new(Expr::FnCall("~".to_string(), vec![lhs_copy, rhs])),
+                    )
+                }
+                _ => return Err(()),
+            };
+        }
+    }
+}
+
+fn get_precedence(token: &Token) -> i32 {
+    match *token {
+        Token::Equals
+        | Token::PlusAssign
+        | Token::MinusAssign
+        | Token::MultiplyAssign
+        | Token::DivideAssign
+        | Token::LeftShiftAssign
+        | Token::RightShiftAssign
+        | Token::AndAssign
+        | Token::OrAssign
+        | Token::XOrAssign
+        | Token::ModuloAssign
+        | Token::PowerOfAssign => 10,
+        Token::Or
+        | Token::XOr
+        | Token::Pipe  => 11,
+        Token::And
+        | Token::Ampersand => 12,
+        Token::LessThan
+        | Token::LessThanEqual
+        | Token::GreaterThan
+        | Token::GreaterThanEqual
+        | Token::EqualTo
+        | Token::NotEqualTo => 15,
+        Token::Plus
+        | Token::Minus => 20,
+        Token::Divide
+        | Token::Multiply
+        | Token::PowerOf => 40,
+        Token::LeftShift
+        | Token::RightShift => 50,
+        Token::Modulo => 60,
+        Token::Period => 100,
+        _ => -1,
+    }
 }
 fn parse_unary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
     let tok = input.last.clone();
