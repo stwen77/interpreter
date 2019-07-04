@@ -104,6 +104,101 @@ pub enum Token {
     Nothing,
     LexErr,
 }
+impl Token {
+    pub fn is_next_unary(&self) -> bool {
+        use self::Token::*;
+
+        match *self {
+            LCurly           | // (+expr) - is unary
+            // RCurly           | {expr} - expr not unary & is closing
+            LParen           | // {-expr} - is unary
+            // RParen           | (expr) - expr not unary & is closing
+            LSquare          | // [-expr] - is unary
+            // RSquare          | [expr] - expr not unary & is closing
+            Plus             |
+            UnaryPlus        |
+            Minus            |
+            UnaryMinus       |
+            Multiply         |
+            Divide           |
+            Colon            |
+            Comma            |
+            Period           |
+            Equals           |
+            LessThan         |
+            GreaterThan      |
+            Bang             |
+            LessThanEqual    |
+            GreaterThanEqual |
+            EqualTo          |
+            NotEqualTo       |
+            Pipe             |
+            Or               |
+            Ampersand        |
+            And              |
+            If               |
+            While            |
+            PlusAssign       |
+            MinusAssign      |
+            MultiplyAssign   |
+            DivideAssign     |
+            LeftShiftAssign  |
+            RightShiftAssign |
+            AndAssign        |
+            OrAssign         |
+            XOrAssign        |
+            LeftShift        |
+            RightShift       |
+            XOr              |
+            Modulo           |
+            ModuloAssign     |
+            Return           |
+            PowerOf          |
+            PowerOfAssign => true,
+            _ => false,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn is_bin_op(&self) -> bool {
+        use self::Token::*;
+
+        match *self {
+            RCurly           |
+            RParen           |
+            RSquare          |
+            Plus             |
+            Minus            |
+            Multiply         |
+            Divide           |
+            Comma            |
+            // Period           | <- does period count?
+            Equals           |
+            LessThan         |
+            GreaterThan      |
+            LessThanEqual    |
+            GreaterThanEqual |
+            EqualTo          |
+            NotEqualTo       |
+            Pipe             |
+            Or               |
+            Ampersand        |
+            And              |
+            PowerOf => true,
+            _ => false,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn is_un_op(&self) -> bool {
+        use self::Token::*;
+
+        match *self {
+            UnaryPlus | UnaryMinus | Equals | Bang | Return => true,
+            _ => false,
+        }
+    }
+}
 pub fn parse(input: &mut str) {
     let mut statement: Vec<Statment> = Vec::new();
     //let mut fn_def = Vec::new();
@@ -451,6 +546,22 @@ impl<'a> TokenIterator<'a> {
                     Ok(out) => return Some(Token::StringConst(out)),
                     Err(e) => return Some(Token::LexErr),
                 },
+                '{' => return Some(Token::LCurly),
+                '}' => return Some(Token::RCurly),
+                '(' => return Some(Token::LParen),
+                ')' => return Some(Token::RParen),
+                '[' => return Some(Token::LSquare),
+                ']' => return Some(Token::RSquare),
+                '+' => {
+                    return match self.char_stream.peek() {
+                        Some(&'=') => {
+                            self.char_stream.next();
+                            Some(Token::PlusAssign)
+                        }
+                        _ if self.last.is_next_unary() => Some(Token::UnaryPlus),
+                        _ => Some(Token::Plus),
+                    }
+                }
                 _x if _x.is_whitespace() => (),
                 _ => return Some(Token::LexErr),
             }
