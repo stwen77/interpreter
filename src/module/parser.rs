@@ -105,7 +105,7 @@ pub enum Token {
     LexErr,
 }
 pub fn parse(input: &mut str) {
-    //let mut statement = Vec::new();
+    let mut statement: Vec<Statment> = Vec::new();
     //let mut fn_def = Vec::new();
 
     let mut token_iterator = TokenIterator::new(input);
@@ -114,11 +114,12 @@ pub fn parse(input: &mut str) {
         match token_iterator.last {
             Token::Fn => (),
             _ => {
-                parse_statement(&mut token_iterator);
+                statement.push(parse_statement(&mut token_iterator).unwrap());
             }
         }
         token_iterator.next();
     }
+    println!("parsed statment vec :{:?}", statement);
 }
 pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
     match input.last {
@@ -139,12 +140,17 @@ fn parse_express_statement<'a>(input: &mut TokenIterator<'a>) -> Result<Statment
         _ => {
             let lhs = parse_unary(input).unwrap_or(Expr::IntConst(0));
             parse_binary_operation(input, 0, lhs).unwrap()
+            //println!("lhs {:?}", lhs);error
         }
     };
     println!("expr res {:?}", express);
     Ok(Statment::Expr(Box::new(express)))
 }
-fn parse_binary_operation<'a>(input: &mut TokenIterator<'a>, prec: i32, lhs: Expr) -> Result<Expr, ()> {
+fn parse_binary_operation<'a>(
+    input: &mut TokenIterator<'a>,
+    prec: i32,
+    lhs: Expr,
+) -> Result<Expr, ()> {
     let mut lhs_curr = lhs;
 
     loop {
@@ -164,7 +170,7 @@ fn parse_binary_operation<'a>(input: &mut TokenIterator<'a>, prec: i32, lhs: Exp
             let mut next_prec = -1;
 
             if let next_op = input.last.clone() {
-                //next_prec = get_precedence(next_op);
+                next_prec = get_precedence(&next_op);
             }
 
             if curr_prec < next_prec {
@@ -293,24 +299,17 @@ fn get_precedence(token: &Token) -> i32 {
         | Token::XOrAssign
         | Token::ModuloAssign
         | Token::PowerOfAssign => 10,
-        Token::Or
-        | Token::XOr
-        | Token::Pipe  => 11,
-        Token::And
-        | Token::Ampersand => 12,
+        Token::Or | Token::XOr | Token::Pipe => 11,
+        Token::And | Token::Ampersand => 12,
         Token::LessThan
         | Token::LessThanEqual
         | Token::GreaterThan
         | Token::GreaterThanEqual
         | Token::EqualTo
         | Token::NotEqualTo => 15,
-        Token::Plus
-        | Token::Minus => 20,
-        Token::Divide
-        | Token::Multiply
-        | Token::PowerOf => 40,
-        Token::LeftShift
-        | Token::RightShift => 50,
+        Token::Plus | Token::Minus => 20,
+        Token::Divide | Token::Multiply | Token::PowerOf => 40,
+        Token::LeftShift | Token::RightShift => 50,
         Token::Modulo => 60,
         Token::Period => 100,
         _ => -1,
@@ -376,7 +375,7 @@ impl<'a> TokenIterator<'a> {
             Some(c) => c,
             None => Token::Nothing,
         };
-
+        //println!("self last restored : {:?}", self.last);
         Some(self.last.clone())
     }
     fn inner_next(&mut self) -> Option<Token> {
@@ -412,7 +411,6 @@ impl<'a> TokenIterator<'a> {
 
                     let out: String = result.into_iter().collect();
                     if let Ok(val) = out.parse::<i64>() {
-                        println!("{}", val);
                         return Some(Token::IntConst(val));
                     } else if let Ok(val) = out.parse::<f64>() {
                         println!("{}", val);
