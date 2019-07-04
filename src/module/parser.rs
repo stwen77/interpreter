@@ -418,11 +418,55 @@ impl<'a> TokenIterator<'a> {
                     }
                     return Some(Token::LexErr);
                 }
+                'A'...'Z' | 'a'...'z' | '_' => {
+                    let mut result = Vec::new();
+                    result.push(c);
 
+                    while let Some(&nxt) = self.char_stream.peek() {
+                        match nxt {
+                            x if x.is_alphanumeric() || x == '_' => {
+                                result.push(x);
+                                self.char_stream.next();
+                            }
+                            _ => break,
+                        }
+                    }
+
+                    let out: String = result.iter().cloned().collect();
+                    match out.as_ref() {
+                        "true" => return Some(Token::True),
+                        "false" => return Some(Token::False),
+                        "let" => return Some(Token::Var),
+                        "if" => return Some(Token::If),
+                        "else" => return Some(Token::Else),
+                        "while" => return Some(Token::While),
+                        "loop" => return Some(Token::Loop),
+                        "break" => return Some(Token::Break),
+                        "return" => return Some(Token::Return),
+                        "fn" => return Some(Token::Fn),
+                        x => return Some(Token::Identifier(x.to_string())),
+                    }
+                }
+                '"' => match self.parse_string_const('"') {
+                    Ok(out) => return Some(Token::StringConst(out)),
+                    Err(e) => return Some(Token::LexErr),
+                },
                 _x if _x.is_whitespace() => (),
                 _ => return Some(Token::LexErr),
             }
         }
         None
+    }
+    pub fn parse_string_const(&mut self, enclosing_char: char) -> Result<String, ()> {
+        let mut result = vec![];
+        while let Some(nxt) = self.char_stream.next() {
+            match nxt {
+                x if enclosing_char == x => break,
+                _ => result.push(nxt),
+            }
+        }
+
+        let out: String = result.into_iter().collect();
+        Ok(out)
     }
 }
