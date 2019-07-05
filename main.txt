@@ -1,4 +1,6 @@
+!;
 true;
+abcdefg;
 "abcdefg";
 123456;
 123.456;

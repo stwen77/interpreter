@@ -429,6 +429,23 @@ fn parse_unary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
         _ => parse_primary(input),
     }
 }
+fn parse_ident_expr<'a>(id: String,
+                        input: &mut TokenIterator<'a>)
+                        -> Result<Expr, ()> {
+    match input.last {
+        Token::LParen => {
+            input.next();
+            //parse_call_expr(id, input)
+            Err(())
+        }
+        Token::LSquare => {
+            input.next();
+            //parse_index_expr(id, input)
+            Err(())
+        }
+        _ => Ok(Expr::Identifier(id)),
+    }
+}
 fn parse_primary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
     if let Some(token) = input.next() {
         match token {
@@ -436,7 +453,7 @@ fn parse_primary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
             Token::FloatConst(ref x) => Ok(Expr::FloatConst(*x)),
             Token::StringConst(ref s) => Ok(Expr::StringConst(s.clone())),
             Token::CharConst(ref c) => Ok(Expr::CharConst(*c)),
-            //Token::Identifier(ref s) => parse_ident_expr,
+            Token::Identifier(ref s) => parse_ident_expr(s.clone(), input),
             //Token::LParen => parse_paren_expr,
             //Token::LSquare => parse_array_expr,
             Token::True => Ok(Expr::True),
@@ -567,19 +584,120 @@ impl<'a> TokenIterator<'a> {
                         Some(&'=') => {
                             self.char_stream.next();
                             Some(Token::MinusAssign)
-                        },
+                        }
                         _ if self.last.is_next_unary() => Some(Token::UnaryMinus),
                         _ => Some(Token::Minus),
                     }
-                },
+                }
                 '*' => {
                     return match self.char_stream.peek() {
                         Some(&'=') => {
                             self.char_stream.next();
                             Some(Token::MultiplyAssign)
-                        },
-                        _ => Some(Token::Multiply)
+                        }
+                        _ => Some(Token::Multiply),
                     }
+                }
+                ';' => return Some(Token::Semicolon),
+                ':' => return Some(Token::Colon),
+                ',' => return Some(Token::Comma),
+                '.' => return Some(Token::Period),
+                '=' => match self.char_stream.peek() {
+                    Some(&'=') => {
+                        self.char_stream.next();
+                        return Some(Token::EqualTo);
+                    }
+                    _ => return Some(Token::Equals),
+                },
+                '<' => match self.char_stream.peek() {
+                    Some(&'=') => {
+                        self.char_stream.next();
+                        return Some(Token::LessThanEqual);
+                    }
+                    Some(&'<') => {
+                        self.char_stream.next();
+                        return match self.char_stream.peek() {
+                            Some(&'=') => {
+                                self.char_stream.next();
+                                Some(Token::LeftShiftAssign)
+                            }
+                            _ => {
+                                self.char_stream.next();
+                                Some(Token::LeftShift)
+                            }
+                        };
+                    }
+                    _ => return Some(Token::LessThan),
+                },
+                '>' => match self.char_stream.peek() {
+                    Some(&'=') => {
+                        self.char_stream.next();
+                        return Some(Token::GreaterThanEqual);
+                    }
+                    Some(&'>') => {
+                        self.char_stream.next();
+                        return match self.char_stream.peek() {
+                            Some(&'=') => {
+                                self.char_stream.next();
+                                Some(Token::RightShiftAssign)
+                            }
+                            _ => {
+                                self.char_stream.next();
+                                Some(Token::RightShift)
+                            }
+                        };
+                    }
+                    _ => return Some(Token::GreaterThan),
+                },
+                '!' => match self.char_stream.peek() {
+                    Some(&'=') => {
+                        self.char_stream.next();
+                        return Some(Token::NotEqualTo);
+                    }
+                    _ => return Some(Token::Bang),
+                },
+                '|' => match self.char_stream.peek() {
+                    Some(&'|') => {
+                        self.char_stream.next();
+                        return Some(Token::Or);
+                    }
+                    Some(&'=') => {
+                        self.char_stream.next();
+                        return Some(Token::OrAssign);
+                    }
+                    _ => return Some(Token::Pipe),
+                },
+                '&' => match self.char_stream.peek() {
+                    Some(&'&') => {
+                        self.char_stream.next();
+                        return Some(Token::And);
+                    }
+                    Some(&'=') => {
+                        self.char_stream.next();
+                        return Some(Token::AndAssign);
+                    }
+                    _ => return Some(Token::Ampersand),
+                },
+                '^' => match self.char_stream.peek() {
+                    Some(&'=') => {
+                        self.char_stream.next();
+                        return Some(Token::XOrAssign);
+                    }
+                    _ => return Some(Token::XOr),
+                },
+                '%' => match self.char_stream.peek() {
+                    Some(&'=') => {
+                        self.char_stream.next();
+                        return Some(Token::ModuloAssign);
+                    }
+                    _ => return Some(Token::Modulo),
+                },
+                '~' => match self.char_stream.peek() {
+                    Some(&'=') => {
+                        self.char_stream.next();
+                        return Some(Token::PowerOfAssign);
+                    }
+                    _ => return Some(Token::PowerOf),
                 },
                 _x if _x.is_whitespace() => (),
                 _ => return Some(Token::LexErr),
