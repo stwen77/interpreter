@@ -1,4 +1,5 @@
 !;
+a[10];
 true;
 abcdefg;
 "abcdefg";

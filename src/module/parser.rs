@@ -217,21 +217,31 @@ pub fn parse(input: &mut str) {
     println!("parsed statment vec :{:?}", statement);
 }
 pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
-    match input.last {
-        Token::If => Err(()),
-        Token::While => Err(()),
-        Token::Loop => Err(()),
-        Token::Break => Err(()),
-        Token::Return => Err(()),
-        Token::LCurly => Err(()),
-        Token::Var => Err(()),
+    match input.peek() {
+        Some(Token::If) => Err(()),
+        Some(Token::While) => Err(()),
+        Some(Token::Loop) => Err(()),
+        Some(Token::Break) => Err(()),
+        Some(Token::Return) => Err(()),
+        Some(Token::LCurly) => Err(()),
+        Some(Token::Var) => Err(()),
         _ => parse_express_statement(input),
     }
 }
 fn parse_var<'a>(input: &mut Peekable<Chars<'a>>) {}
+fn parse_expr<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
+    match input.peek() {
+        Some(Token::RParen) => Ok(Expr::Unit),
+        _ => {
+            let lhs = r#try!(parse_unary(input));
+
+            parse_binary_operation(input, 0, lhs)
+        }
+    }
+}
 fn parse_express_statement<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
-    let express = match input.last {
-        Token::RParen => Expr::Unit,
+    let express = match input.peek() {
+        Some(Token::RParen) => Expr::Unit,
         _ => {
             let lhs = parse_unary(input).unwrap_or(Expr::IntConst(0));
             parse_binary_operation(input, 0, lhs).unwrap()
@@ -411,7 +421,11 @@ fn get_precedence(token: &Token) -> i32 {
     }
 }
 fn parse_unary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
-    let tok = input.last.clone();
+    //let tok = input.last.clone();
+    let tok = match input.peek() {
+        Some(tok) => tok.clone(),
+        None => return Err(()),
+    };
 
     match tok {
         Token::UnaryMinus => {
@@ -429,19 +443,35 @@ fn parse_unary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
         _ => parse_primary(input),
     }
 }
+fn parse_index_expr<'a>(id: String,
+                        input: &mut TokenIterator<'a>)
+                        -> Result<Expr, ()> {
+    if let Ok(idx) = parse_expr(input) {
+        println!("!!!parse {:?}",input.last);
+        match input.peek() {
+            Some(Token::RSquare) => {
+                input.next();
+                return Ok(Expr::Index(id, Box::new(idx)));
+            }
+            _ => return Err(()),
+        }
+    } else {
+        return Err(());
+    }
+}
 fn parse_ident_expr<'a>(id: String,
                         input: &mut TokenIterator<'a>)
                         -> Result<Expr, ()> {
-    match input.last {
-        Token::LParen => {
+    println!("!!!parse {:?}",input.last);
+    match input.peek() {
+        Some(Token::LParen) => {
             input.next();
             //parse_call_expr(id, input)
             Err(())
         }
-        Token::LSquare => {
+        Some(Token::LSquare) => {
             input.next();
-            //parse_index_expr(id, input)
-            Err(())
+            parse_index_expr(id, input)
         }
         _ => Ok(Expr::Identifier(id)),
     }
@@ -471,16 +501,23 @@ fn parse_primary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
         Err(())
     }
 }
+#[derive(Clone)]
 pub struct TokenIterator<'a> {
     last: Token,
     char_stream: Peekable<Chars<'a>>,
 }
+
 impl<'a> TokenIterator<'a> {
     fn new(input: &'a str) -> Self {
         TokenIterator {
             last: Token::Nothing,
             char_stream: input.chars().peekable(),
         }
+    }
+    fn peek(&mut self) -> Option<Token> {
+        let mut temp_iter = self.clone();
+        let temp_last = temp_iter.next();
+        temp_last
     }
     fn next(&mut self) -> Option<Token> {
         self.last = match self.inner_next() {
