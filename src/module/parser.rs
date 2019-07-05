@@ -261,7 +261,7 @@ fn parse_binary_operation<'a>(
     loop {
         let mut curr_prec = -1;
 
-        if let curr_op = input.last.clone() {
+        if let Some(curr_op) = input.peek() {
             curr_prec = get_precedence(&curr_op);
         }
 
@@ -274,7 +274,7 @@ fn parse_binary_operation<'a>(
 
             let mut next_prec = -1;
 
-            if let next_op = input.last.clone() {
+            if let Some(next_op) = input.peek() {
                 next_prec = get_precedence(&next_op);
             }
 
@@ -421,7 +421,6 @@ fn get_precedence(token: &Token) -> i32 {
     }
 }
 fn parse_unary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
-    //let tok = input.last.clone();
     let tok = match input.peek() {
         Some(tok) => tok.clone(),
         None => return Err(()),
@@ -447,7 +446,6 @@ fn parse_index_expr<'a>(id: String,
                         input: &mut TokenIterator<'a>)
                         -> Result<Expr, ()> {
     if let Ok(idx) = parse_expr(input) {
-        println!("!!!parse {:?}",input.last);
         match input.peek() {
             Some(Token::RSquare) => {
                 input.next();
@@ -462,7 +460,6 @@ fn parse_index_expr<'a>(id: String,
 fn parse_ident_expr<'a>(id: String,
                         input: &mut TokenIterator<'a>)
                         -> Result<Expr, ()> {
-    println!("!!!parse {:?}",input.last);
     match input.peek() {
         Some(Token::LParen) => {
             input.next();
@@ -562,7 +559,6 @@ impl<'a> TokenIterator<'a> {
                     if let Ok(val) = out.parse::<i64>() {
                         return Some(Token::IntConst(val));
                     } else if let Ok(val) = out.parse::<f64>() {
-                        println!("{}", val);
                         return Some(Token::FloatConst(val));
                     }
                     return Some(Token::LexErr);
