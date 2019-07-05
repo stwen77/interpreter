@@ -562,6 +562,25 @@ impl<'a> TokenIterator<'a> {
                         _ => Some(Token::Plus),
                     }
                 }
+                '-' => {
+                    return match self.char_stream.peek() {
+                        Some(&'=') => {
+                            self.char_stream.next();
+                            Some(Token::MinusAssign)
+                        },
+                        _ if self.last.is_next_unary() => Some(Token::UnaryMinus),
+                        _ => Some(Token::Minus),
+                    }
+                },
+                '*' => {
+                    return match self.char_stream.peek() {
+                        Some(&'=') => {
+                            self.char_stream.next();
+                            Some(Token::MultiplyAssign)
+                        },
+                        _ => Some(Token::Multiply)
+                    }
+                },
                 _x if _x.is_whitespace() => (),
                 _ => return Some(Token::LexErr),
             }
