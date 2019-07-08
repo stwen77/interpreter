@@ -104,7 +104,11 @@ impl Engine {
         }
     }
     pub fn eval<T>(&mut self, input: &mut str) -> Result<T, ()> {
-        parse(input);
-        Err(())
+        let tree = parse(input);
+        
+        match tree {
+            Ok(ref os, ref fns) => {},
+            Err(_) => Err(()),
+        }
     }
 }
