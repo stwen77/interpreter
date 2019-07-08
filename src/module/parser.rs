@@ -218,7 +218,7 @@ pub fn parse(input: &mut str) {
 }
 pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
     match input.peek() {
-        Some(Token::If) => Err(()),
+        Some(Token::If) => parse_if(input),
         Some(Token::While) => Err(()),
         Some(Token::Loop) => Err(()),
         Some(Token::Break) => Err(()),
@@ -226,6 +226,56 @@ pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
         Some(Token::LCurly) => Err(()),
         Some(Token::Var) => Err(()),
         _ => parse_express_statement(input),
+    }
+}
+fn parse_block<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
+    match input.peek() {
+        Some(Token::LCurly) => (),
+        _ => return Err(()),
+    }
+
+    input.next();
+
+    let mut stmts = Vec::new();
+
+    let skip_body = match input.peek() {
+        Some(Token::RCurly) => true,
+        _ => false,
+    };
+
+    if !skip_body {
+        while let Some(_) = input.peek() {
+            stmts.push(parse_statement(input)?);
+
+            if let Some(Token::Semicolon) = input.peek() {
+                input.next();
+            }
+
+            if let Some(Token::RCurly) = input.peek() { break }
+        }
+    }
+
+    match input.peek() {
+        Some(Token::RCurly) => {
+            input.next();
+            Ok(Statment::Block(stmts))
+        }
+        _ => Err(()),
+    }
+}
+fn parse_if<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
+    input.next();
+
+    let guard = parse_expr(input)?;
+    let body = parse_block(input)?;
+
+    match input.peek() {
+        Some(Token::Else) => {
+            input.next();
+            let else_body = parse_block(input)?;
+            Ok(Statment::IfElse(Box::new(guard), Box::new(body), Box::new(else_body)))
+        }
+        _ => Ok(Statment::If(Box::new(guard), Box::new(body))),
     }
 }
 fn parse_var<'a>(input: &mut Peekable<Chars<'a>>) {}
