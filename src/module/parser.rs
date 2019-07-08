@@ -199,15 +199,15 @@ impl Token {
         }
     }
 }
-pub fn parse(input: &mut str) {
+pub fn parse(input: &mut str) ->Result<(Vec<Statment>, Vec<FnDef>), ()>{
     let mut statement: Vec<Statment> = Vec::new();
-    //let mut fn_def = Vec::new();
+    let mut fn_def = Vec::new();
 
     let mut token_iterator = TokenIterator::new(input);
     while let Some(a) = token_iterator.char_stream.peek() {
         //println!("{}",a);
-        match token_iterator.last {
-            Token::Fn => (),
+        match token_iterator.peek() {
+            Some(Token::Fn) => fn_def.push(parse_fn(&mut token_iterator)?),
             _ => {
                 statement.push(parse_statement(&mut token_iterator).unwrap());
             }
@@ -215,6 +215,54 @@ pub fn parse(input: &mut str) {
         token_iterator.next();
     }
     println!("parsed statment vec :{:?}", statement);
+    println!("parsed function vec :{:?}", fn_def);
+    Ok((statement, fn_def))
+}
+fn parse_fn<'a>(input: &mut TokenIterator<'a>) -> Result<FnDef, ()> {
+    input.next();
+
+    let name = match input.next() {
+        Some(Token::Identifier(ref s)) => s.clone(),
+        _ => return Err(()),
+    };
+
+    match input.peek() {
+        Some(Token::LParen) => {
+            input.next();
+        }
+        _ => return Err(()),
+    }
+
+    let mut params = Vec::new();
+
+    let skip_params = match input.peek() {
+        Some(Token::RParen) => {
+            input.next();
+            true
+        }
+        _ => false,
+    };
+
+    if !skip_params {
+        loop {
+            match input.next() {
+                Some(Token::RParen) => break,
+                Some(Token::Comma) => (),
+                Some(Token::Identifier(ref s)) => {
+                    params.push(s.clone());
+                }
+                _ => return Err(()),
+            }
+        }
+    }
+
+    let body = parse_block(input)?;
+
+    Ok(FnDef {
+        name: name,
+        params: params,
+        body: Box::new(body),
+    })
 }
 pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
     match input.peek() {

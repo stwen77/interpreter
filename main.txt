@@ -1,5 +1,5 @@
 let x = 1;
-while aaa { 20 }
+while aaa { 20 };
 if true { 55 }else{10};
 [10,20,30];
 f_a(10,20,30);
@@ -9,3 +9,6 @@ abcdefg;
 "abcdefg";
 123456;
 123.456;
+fn bob(){
+    3
+}
