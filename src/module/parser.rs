@@ -501,6 +501,14 @@ fn parse_ident_expr<'a>(id: String,
         _ => Ok(Expr::Identifier(id)),
     }
 }
+fn parse_paren_expr<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
+    let expr = parse_expr(input)?;
+
+    match input.next() {
+        Some(Token::RParen) => Ok(expr),
+        _ => Err(()),
+    }
+}
 fn parse_primary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
     if let Some(token) = input.next() {
         match token {
@@ -509,7 +517,7 @@ fn parse_primary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
             Token::StringConst(ref s) => Ok(Expr::StringConst(s.clone())),
             Token::CharConst(ref c) => Ok(Expr::CharConst(*c)),
             Token::Identifier(ref s) => parse_ident_expr(s.clone(), input),
-            //Token::LParen => parse_paren_expr,
+            Token::LParen => parse_paren_expr(input),
             //Token::LSquare => parse_array_expr,
             Token::True => Ok(Expr::True),
             Token::False => Ok(Expr::False),
