@@ -442,9 +442,7 @@ fn parse_unary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
         _ => parse_primary(input),
     }
 }
-fn parse_index_expr<'a>(id: String,
-                        input: &mut TokenIterator<'a>)
-                        -> Result<Expr, ()> {
+fn parse_index_expr<'a>(id: String, input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
     if let Ok(idx) = parse_expr(input) {
         match input.peek() {
             Some(Token::RSquare) => {
@@ -457,9 +455,7 @@ fn parse_index_expr<'a>(id: String,
         return Err(());
     }
 }
-fn parse_call_expr<'a>(id: String,
-                       input: &mut TokenIterator<'a>)
-                       -> Result<Expr, ()> {
+fn parse_call_expr<'a>(id: String, input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
     let mut args = Vec::new();
 
     if let Some(Token::RParen) = input.peek() {
@@ -486,9 +482,7 @@ fn parse_call_expr<'a>(id: String,
         input.next();
     }
 }
-fn parse_ident_expr<'a>(id: String,
-                        input: &mut TokenIterator<'a>)
-                        -> Result<Expr, ()> {
+fn parse_ident_expr<'a>(id: String, input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
     match input.peek() {
         Some(Token::LParen) => {
             input.next();
@@ -509,6 +503,35 @@ fn parse_paren_expr<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
         _ => Err(()),
     }
 }
+fn parse_array_expr<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
+    let mut arr = Vec::new();
+
+    let skip_contents = match input.peek() {
+        Some(Token::RSquare) => true,
+        _ => false,
+    };
+
+    if !skip_contents {
+        while let Some(_) = input.peek() {
+            arr.push(parse_expr(input)?);
+            if let Some(Token::Comma) = input.peek() {
+                input.next();
+            }
+
+            if let Some(Token::RSquare) = input.peek() {
+                break;
+            }
+        }
+    }
+
+    match input.peek() {
+        Some(Token::RSquare) => {
+            input.next();
+            Ok(Expr::Array(arr))
+        }
+        _ => Err(()),
+    }
+}
 fn parse_primary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
     if let Some(token) = input.next() {
         match token {
@@ -518,7 +541,7 @@ fn parse_primary<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
             Token::CharConst(ref c) => Ok(Expr::CharConst(*c)),
             Token::Identifier(ref s) => parse_ident_expr(s.clone(), input),
             Token::LParen => parse_paren_expr(input),
-            //Token::LSquare => parse_array_expr,
+            Token::LSquare => parse_array_expr(input),
             Token::True => Ok(Expr::True),
             Token::False => Ok(Expr::False),
             Token::LexErr => {
