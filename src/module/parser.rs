@@ -219,14 +219,29 @@ pub fn parse(input: &mut str) {
 pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
     match input.peek() {
         Some(Token::If) => parse_if(input),
-        Some(Token::While) => Err(()),
-        Some(Token::Loop) => Err(()),
+        Some(Token::While) => parse_while(input),
+        Some(Token::Loop) => parse_loop(input),
         Some(Token::Break) => Err(()),
         Some(Token::Return) => Err(()),
         Some(Token::LCurly) => Err(()),
         Some(Token::Var) => Err(()),
         _ => parse_express_statement(input),
     }
+}
+fn parse_loop<'a>(input:&mut TokenIterator<'a>) -> Result<Statment,()>{
+    input.next();
+
+    let body = parse_block(input)?;
+
+    Ok(Statment::Loop(Box::new(body)))
+}
+fn parse_while<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
+    input.next();
+
+    let guard = parse_expr(input)?;
+    let body = parse_block(input)?;
+
+    Ok(Statment::While(Box::new(guard), Box::new(body)))
 }
 fn parse_block<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
     match input.peek() {
