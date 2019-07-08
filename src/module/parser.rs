@@ -457,14 +457,42 @@ fn parse_index_expr<'a>(id: String,
         return Err(());
     }
 }
+fn parse_call_expr<'a>(id: String,
+                       input: &mut TokenIterator<'a>)
+                       -> Result<Expr, ()> {
+    let mut args = Vec::new();
+
+    if let Some(Token::RParen) = input.peek() {
+        input.next();
+        return Ok(Expr::FnCall(id, args));
+    }
+
+    loop {
+        if let Ok(arg) = parse_expr(input) {
+            args.push(arg);
+        } else {
+            return Err(());
+        }
+
+        match input.peek() {
+            Some(Token::RParen) => {
+                input.next();
+                return Ok(Expr::FnCall(id, args));
+            }
+            Some(Token::Comma) => (),
+            _ => return Err(()),
+        }
+
+        input.next();
+    }
+}
 fn parse_ident_expr<'a>(id: String,
                         input: &mut TokenIterator<'a>)
                         -> Result<Expr, ()> {
     match input.peek() {
         Some(Token::LParen) => {
             input.next();
-            //parse_call_expr(id, input)
-            Err(())
+            parse_call_expr(id, input)
         }
         Some(Token::LSquare) => {
             input.next();
