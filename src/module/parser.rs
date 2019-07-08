@@ -221,10 +221,22 @@ pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
         Some(Token::If) => parse_if(input),
         Some(Token::While) => parse_while(input),
         Some(Token::Loop) => parse_loop(input),
-        Some(Token::Break) => Err(()),
-        Some(Token::Return) => Err(()),
-        Some(Token::LCurly) => Err(()),
-        Some(Token::Var) => Err(()),
+        Some(Token::Break) => {
+            input.next();
+            Ok(Statment::Break)
+        },
+        Some(Token::Return) => {
+                        input.next();
+            match input.peek() {
+                Some(Token::Semicolon) => Ok(Statment::Return),
+                _ => {
+                    let ret = parse_expr(input)?;
+                    Ok(Statment::ReturnWithVal(Box::new(ret)))
+                }
+            }
+        },
+        Some(Token::LCurly) => parse_block(input),
+        Some(Token::Var) => parse_var(input),
         _ => parse_express_statement(input),
     }
 }
@@ -293,7 +305,23 @@ fn parse_if<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
         _ => Ok(Statment::If(Box::new(guard), Box::new(body))),
     }
 }
-fn parse_var<'a>(input: &mut Peekable<Chars<'a>>) {}
+fn parse_var<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
+    input.next();
+
+    let name = match input.next() {
+        Some(Token::Identifier(ref s)) => s.clone(),
+        _ => return Err(()),
+    };
+
+    match input.peek() {
+        Some(Token::Equals) => {
+            input.next();
+            let initializer = parse_expr(input)?;
+            Ok(Statment::Var(name, Some(Box::new(initializer))))
+        }
+        _ => Ok(Statment::Var(name, None)),
+    }
+}
 fn parse_expr<'a>(input: &mut TokenIterator<'a>) -> Result<Expr, ()> {
     match input.peek() {
         Some(Token::RParen) => Ok(Expr::Unit),
