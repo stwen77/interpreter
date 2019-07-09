@@ -199,7 +199,7 @@ impl Token {
         }
     }
 }
-pub fn parse(input: &mut str) ->Result<(Vec<Statment>, Vec<FnDef>), ()>{
+pub fn parse(input: &mut str) -> Result<(Vec<Statment>, Vec<FnDef>), ()> {
     let mut statement: Vec<Statment> = Vec::new();
     let mut fn_def = Vec::new();
 
@@ -272,9 +272,9 @@ pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
         Some(Token::Break) => {
             input.next();
             Ok(Statment::Break)
-        },
+        }
         Some(Token::Return) => {
-                        input.next();
+            input.next();
             match input.peek() {
                 Some(Token::Semicolon) => Ok(Statment::Return),
                 _ => {
@@ -282,13 +282,13 @@ pub fn parse_statement(input: &mut TokenIterator) -> Result<Statment, ()> {
                     Ok(Statment::ReturnWithVal(Box::new(ret)))
                 }
             }
-        },
+        }
         Some(Token::LCurly) => parse_block(input),
         Some(Token::Var) => parse_var(input),
         _ => parse_express_statement(input),
     }
 }
-fn parse_loop<'a>(input:&mut TokenIterator<'a>) -> Result<Statment,()>{
+fn parse_loop<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
     input.next();
 
     let body = parse_block(input)?;
@@ -326,7 +326,9 @@ fn parse_block<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
                 input.next();
             }
 
-            if let Some(Token::RCurly) = input.peek() { break }
+            if let Some(Token::RCurly) = input.peek() {
+                break;
+            }
         }
     }
 
@@ -348,7 +350,11 @@ fn parse_if<'a>(input: &mut TokenIterator<'a>) -> Result<Statment, ()> {
         Some(Token::Else) => {
             input.next();
             let else_body = parse_block(input)?;
-            Ok(Statment::IfElse(Box::new(guard), Box::new(body), Box::new(else_body)))
+            Ok(Statment::IfElse(
+                Box::new(guard),
+                Box::new(body),
+                Box::new(else_body),
+            ))
         }
         _ => Ok(Statment::If(Box::new(guard), Box::new(body))),
     }

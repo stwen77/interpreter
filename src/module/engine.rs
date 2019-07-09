@@ -1,4 +1,4 @@
-use super::parser::{parse, Expr,FnDef};
+use super::parser::{parse, Expr, FnDef, Statment};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,6 +19,8 @@ pub enum FnIntExt {
 }
 
 pub type FnAny = Fn(Vec<&mut Any>) -> Result<Box<Any>, ()>;
+
+pub type Scope = Vec<(String, Box<Any>)>;
 
 impl Engine {
     pub fn print_engine(&self) {
@@ -78,12 +80,18 @@ impl Engine {
 
         self.functions.insert(spec, Arc::new(FnIntExt::Ext(f)));
     }
-    pub fn evaluate_express(&self, expr: &Expr) -> Result<Box<Any>, ()> {
+    pub fn evaluate_express(&self, scope: &mut Scope, expr: &Expr) -> Result<Box<Any>, ()> {
         let mut testv = 0;
         match *expr {
             Expr::FnCall(ref fn_name, ref args) => {
                 self.call_fn(fn_name.to_owned(), vec![&mut testv])
             }
+            _ => Err(()),
+        }
+    }
+    fn eval_stmt(&self, scope: &mut Scope, stmt: &Statment) -> Result<Box<Any>, ()> {
+        match *stmt {
+            Statment::Expr(ref e) => self.evaluate_express(scope,e),
             _ => Err(()),
         }
     }
@@ -105,23 +113,25 @@ impl Engine {
     }
     pub fn eval<T>(&mut self, input: &mut str) -> Result<T, ()> {
         let tree = parse(input);
-        
+        let mut scope :Scope = Vec::new();
+
         match tree {
             Ok((ref os, ref fns)) => {
                 let mut x: Result<Box<Any>, ()> = Ok(Box::new(()));
-                for f in fns{
+                for f in fns {
                     let name = f.name.clone();
                     let local_f = f.clone();
 
-                    let spec = FnSpec{
+                    let spec = FnSpec {
                         id: name,
                         args: None,
                     };
-                    self.functions.insert(spec, Arc::new(FnIntExt::Int(local_f)));
+                    self.functions
+                        .insert(spec, Arc::new(FnIntExt::Int(local_f)));
                 }
-                
+                for o in os {}
                 Err(())
-            },
+            }
             Err(_) => Err(()),
         }
     }
