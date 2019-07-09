@@ -1,4 +1,4 @@
-use super::parser::{parse, Expr};
+use super::parser::{parse, Expr,FnDef};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -15,7 +15,7 @@ pub struct FnSpec {
 
 pub enum FnIntExt {
     Ext(Box<FnAny>),
-    //Int(FnDef),
+    Int(FnDef),
 }
 
 pub type FnAny = Fn(Vec<&mut Any>) -> Result<Box<Any>, ()>;
@@ -42,7 +42,7 @@ impl Engine {
             .ok_or(())
             .and_then(move |f| match **f {
                 FnIntExt::Ext(ref f) => f(args),
-                //FnIntExt::Int(ref f) => (),
+                FnIntExt::Int(ref f) => Err(()),
             });
         return Ok(Box::new(0));
     }
@@ -107,7 +107,21 @@ impl Engine {
         let tree = parse(input);
         
         match tree {
-            Ok(ref os, ref fns) => {},
+            Ok((ref os, ref fns)) => {
+                let mut x: Result<Box<Any>, ()> = Ok(Box::new(()));
+                for f in fns{
+                    let name = f.name.clone();
+                    let local_f = f.clone();
+
+                    let spec = FnSpec{
+                        id: name,
+                        args: None,
+                    };
+                    self.functions.insert(spec, Arc::new(FnIntExt::Int(local_f)));
+                }
+                
+                Err(())
+            },
             Err(_) => Err(()),
         }
     }
