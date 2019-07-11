@@ -112,9 +112,70 @@ impl Engine {
 
         Ok((idx_sc, idx, val))
     }
+    fn set_dot_val_helper(
+        &self,
+        this_ptr: &mut Any,
+        dot_rhs: &Expr,
+        mut source_val: Box<Any>,
+    ) -> Result<Box<Any>, ()> {
+        match *dot_rhs {
+            Expr::Identifier(ref id) => {
+                let set_fn_name = "set$".to_string() + id;
+                self.call_fn(set_fn_name, vec![this_ptr, source_val.as_mut()])
+            }
+            Expr::Dot(ref inner_lhs, ref inner_rhs) => match **inner_lhs {
+                Expr::Identifier(ref id) => {
+                    let get_fn_name = "get$".to_string() + id;
+                    self.call_fn(get_fn_name, vec![this_ptr])
+                        .and_then(|mut v| {
+                            self.set_dot_val_helper(v.as_mut(), inner_rhs, source_val)
+                                .map(|_| v) // Discard Ok return value
+                        })
+                        .and_then(|mut v| {
+                            let set_fn_name = "set$".to_string() + id;
+
+                            self.call_fn(set_fn_name, vec![this_ptr, v.as_mut()])
+                        })
+                }
+                _ => Err(()),
+            },
+            _ => Err(()),
+        }
+    }
+    fn set_dot_val(
+        &self,
+        scope: &mut Scope,
+        dot_lhs: &Expr,
+        dot_rhs: &Expr,
+        source_val: Box<Any>,
+    ) -> Result<Box<Any>, ()> {
+        match *dot_lhs {
+            Expr::Identifier(ref id) => {
+                let (sc_idx, mut target) = Self::search_scope(scope, id, |x| Ok(x.box_clone()))?;
+                let value = self.set_dot_val_helper(target.as_mut(), dot_rhs, source_val);
+
+                // In case the expression mutated `target`, we need to reassign it because
+                // of the above `clone`.
+                scope[sc_idx].1 = target;
+
+                value
+            }
+            Expr::Index(ref id, ref idx_raw) => {
+                let (sc_idx, idx, mut target) = self.array_value(scope, id, idx_raw)?;
+                let value = self.set_dot_val_helper(target.as_mut(), dot_rhs, source_val);
+
+                // In case the expression mutated `target`, we need to reassign it because
+                // of the above `clone`.
+                scope[sc_idx].1.downcast_mut::<Vec<Box<Any>>>().unwrap()[idx] = target;
+
+                value
+            }
+            _ => Err(()),
+        }
+    }
     pub fn evaluate_express(&self, scope: &mut Scope, expr: &Expr) -> Result<Box<Any>, ()> {
         let mut testv = 0;
-        println!("expr {:?}" ,expr);
+        println!("expr {:?}", expr);
         match *expr {
             Expr::IntConst(i) => Ok(Box::new(i)),
             Expr::FloatConst(i) => Ok(Box::new(i)),
@@ -130,6 +191,48 @@ impl Engine {
             }
             Expr::Index(ref id, ref idx_raw) => {
                 self.array_value(scope, id, idx_raw).map(|(_, _, x)| x)
+            }
+            Expr::Assignment(ref id, ref rhs) => {
+                let rhs_val = self.evaluate_express(scope, rhs)?;
+
+                match **id {
+                    Expr::Identifier(ref n) => {
+                        for &mut (ref name, ref mut val) in &mut scope.iter_mut().rev() {
+                            if *n == *name {
+                                *val = rhs_val;
+
+                                return Ok(Box::new(()));
+                            }
+                        }
+                        Err(())
+                    }
+                    Expr::Index(ref id, ref idx_raw) => {
+                        let idx = self.evaluate_express(scope, idx_raw)?;
+
+                        for &mut (ref name, ref mut val) in &mut scope.iter_mut().rev() {
+                            if *id == *name {
+                                if let Some(i) = idx.downcast_ref::<i64>() {
+                                    if let Some(arr_typed) =
+                                        (*val).downcast_mut() as Option<&mut Vec<Box<Any>>>
+                                    {
+                                        arr_typed[*i as usize] = rhs_val;
+                                        return Ok(Box::new(()));
+                                    } else {
+                                        return Err(());
+                                    }
+                                } else {
+                                    return Err(());
+                                }
+                            }
+                        }
+
+                        Err(())
+                    }
+                    Expr::Dot(ref dot_lhs, ref dot_rhs) => {
+                        self.set_dot_val(scope, dot_lhs, dot_rhs, rhs_val)
+                    }
+                    _ => Err(()),
+                }
             }
             Expr::FnCall(ref fn_name, ref args) => {
                 self.call_fn(fn_name.to_owned(), vec![&mut testv])
