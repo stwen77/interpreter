@@ -1,3 +1,4 @@
+1;
 let x = 1;
 while aaa { 20 };
 if true { 55 }else{10};

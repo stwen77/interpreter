@@ -1,7 +1,9 @@
+use super::any::{Any, AnyExt};
 use super::parser::{parse, Expr, FnDef, Statment};
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::Arc;
+#[derive(Clone)]
 pub struct Engine {
     pub functions: HashMap<FnSpec, Arc<FnIntExt>>,
     pub types: HashMap<TypeId, String>,
@@ -21,7 +23,6 @@ pub enum FnIntExt {
 pub type FnAny = Fn(Vec<&mut Any>) -> Result<Box<Any>, ()>;
 
 pub type Scope = Vec<(String, Box<Any>)>;
-
 impl Engine {
     pub fn print_engine(&self) {
         println!("engine empty");
@@ -80,9 +81,56 @@ impl Engine {
 
         self.functions.insert(spec, Arc::new(FnIntExt::Ext(f)));
     }
+    fn search_scope<'a, F, T>(scope: &'a mut Scope, id: &str, map: F) -> Result<(usize, T), ()>
+    where
+        F: FnOnce(&'a mut Any) -> Result<T, ()>,
+    {
+        scope
+            .iter_mut()
+            .enumerate()
+            .rev()
+            .find(|&(_, &mut (ref name, _))| *id == *name)
+            .ok_or_else(|| ())
+            .and_then(move |(idx, &mut (_, ref mut val))| map(val.as_mut()).map(|val| (idx, val)))
+    }
+    fn array_value(
+        &self,
+        scope: &mut Scope,
+        id: &str,
+        idx: &Expr,
+    ) -> Result<(usize, usize, Box<Any>), ()> {
+        let idx_boxed = self
+            .evaluate_express(scope, idx)?
+            .downcast::<i64>()
+            .map_err(|_| ())?;
+        let idx = *idx_boxed as usize;
+        let (idx_sc, val) = Self::search_scope(scope, id, |val| {
+            ((*val).downcast_mut() as Option<&mut Vec<Box<Any>>>)
+                .map(|arr| arr[idx].clone())
+                .ok_or(())
+        })?;
+
+        Ok((idx_sc, idx, val))
+    }
     pub fn evaluate_express(&self, scope: &mut Scope, expr: &Expr) -> Result<Box<Any>, ()> {
         let mut testv = 0;
+        println!("expr {:?}" ,expr);
         match *expr {
+            Expr::IntConst(i) => Ok(Box::new(i)),
+            Expr::FloatConst(i) => Ok(Box::new(i)),
+            Expr::StringConst(ref s) => Ok(Box::new(s.clone())),
+            Expr::CharConst(ref c) => Ok(Box::new(*c)),
+            Expr::Identifier(ref id) => {
+                for &mut (ref name, ref mut val) in &mut scope.iter_mut().rev() {
+                    if *id == *name {
+                        return Ok(val.clone());
+                    }
+                }
+                Err(())
+            }
+            Expr::Index(ref id, ref idx_raw) => {
+                self.array_value(scope, id, idx_raw).map(|(_, _, x)| x)
+            }
             Expr::FnCall(ref fn_name, ref args) => {
                 self.call_fn(fn_name.to_owned(), vec![&mut testv])
             }
@@ -91,11 +139,11 @@ impl Engine {
     }
     fn eval_stmt(&self, scope: &mut Scope, stmt: &Statment) -> Result<Box<Any>, ()> {
         match *stmt {
-            Statment::Expr(ref e) => self.evaluate_express(scope,e),
+            Statment::Expr(ref e) => self.evaluate_express(scope, e),
             _ => Err(()),
         }
     }
-    pub fn eval_file<T>(&mut self, fname: &str) -> Result<T, ()> {
+    pub fn eval_file<T: Any + Clone>(&mut self, fname: &str) -> Result<T, ()> {
         use std::fs::File;
         use std::io::prelude::*;
         if let Ok(mut f) = File::open(fname) {
@@ -111,9 +159,9 @@ impl Engine {
             Err(())
         }
     }
-    pub fn eval<T>(&mut self, input: &mut str) -> Result<T, ()> {
+    pub fn eval<T: Any + Clone>(&mut self, input: &mut str) -> Result<T, ()> {
         let tree = parse(input);
-        let mut scope :Scope = Vec::new();
+        let mut scope: Scope = Vec::new();
 
         match tree {
             Ok((ref os, ref fns)) => {
@@ -129,7 +177,15 @@ impl Engine {
                     self.functions
                         .insert(spec, Arc::new(FnIntExt::Int(local_f)));
                 }
-                for o in os {}
+
+                for o in os {
+                    x = match self.eval_stmt(&mut scope, o) {
+                        Ok(v) => Ok(v),
+                        Err(e) => Err(()),
+                    };
+                    println!("x = {:?}", x);
+                }
+
                 Err(())
             }
             Err(_) => Err(()),
