@@ -246,6 +246,16 @@ impl Engine {
                 }
                 _ => Err(()),
             },
+            Expr::Array(ref contents) => {
+                let mut arr = Vec::new();
+
+                for item in &(*contents) {
+                    let arg = self.evaluate_express(scope, item)?;
+                    arr.push(arg);
+                }
+
+                Ok(Box::new(arr))
+            }
             _ => Err(()),
         }
     }
