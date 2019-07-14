@@ -173,6 +173,82 @@ impl Engine {
             _ => Err(()),
         }
     }
+    fn get_dot_val(
+        &self,
+        scope: &mut Scope,
+        dot_lhs: &Expr,
+        dot_rhs: &Expr,
+    ) -> Result<Box<Any>, ()> {
+        match *dot_lhs {
+            Expr::Identifier(ref id) => {
+                let (sc_idx, mut target) = Self::search_scope(scope, id, |x| Ok(x.box_clone()))?;
+                let value = self.get_dot_val_helper(scope, target.as_mut(), dot_rhs);
+
+                // In case the expression mutated `target`, we need to reassign it because
+                // of the above `clone`.
+                scope[sc_idx].1 = target;
+
+                value
+            }
+            Expr::Index(ref id, ref idx_raw) => {
+                let (sc_idx, idx, mut target) = self.array_value(scope, id, idx_raw)?;
+                let value = self.get_dot_val_helper(scope, target.as_mut(), dot_rhs);
+
+                // In case the expression mutated `target`, we need to reassign it because
+                // of the above `clone`.
+                scope[sc_idx].1.downcast_mut::<Vec<Box<Any>>>().unwrap()[idx] = target;
+
+                value
+            }
+            _ => Err(()),
+        }
+    }
+    fn get_dot_val_helper(
+        &self,
+        scope: &mut Scope,
+        this_ptr: &mut Any,
+        dot_rhs: &Expr,
+    ) -> Result<Box<Any>, ()> {
+        use std::iter::once;
+
+        match *dot_rhs {
+            Expr::FnCall(ref fn_name, ref args) => {
+                let mut args: Vec<Box<Any>> = args.iter()
+                    .map(|arg| self.evaluate_express(scope, arg))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let args = once(this_ptr)
+                    .chain(args.iter_mut().map(|b| b.as_mut()))
+                    .collect();
+
+                self.call_fn(fn_name.to_owned(), args)
+            }
+            Expr::Identifier(ref id) => {
+                let get_fn_name = "get$".to_string() + id;
+
+                self.call_fn(get_fn_name, vec![this_ptr])
+            }
+            Expr::Index(ref id, ref idx_raw) => {
+                let idx = self.evaluate_express(scope, idx_raw)?;
+                let get_fn_name = "get$".to_string() + id;
+
+                let mut val = self.call_fn(get_fn_name, vec![this_ptr])?;
+
+                ((*val).downcast_mut() as Option<&mut Vec<Box<Any>>>)
+                    .and_then(|arr| idx.downcast_ref::<i64>().map(|idx| (arr, *idx as usize)))
+                    .map(|(arr, idx)| arr[idx].clone())
+                    .ok_or(())
+            }
+            Expr::Dot(ref inner_lhs, ref inner_rhs) => match **inner_lhs {
+                Expr::Identifier(ref id) => {
+                    let get_fn_name = "get$".to_string() + id;
+                    self.call_fn(get_fn_name, vec![this_ptr])
+                        .and_then(|mut v| self.get_dot_val_helper(scope, v.as_mut(), inner_rhs))
+                }
+                _ => Err(()),
+            },
+            _ => Err(()),
+        }
+    }
     pub fn evaluate_express(&self, scope: &mut Scope, expr: &Expr) -> Result<Box<Any>, ()> {
         let mut testv = 0;
         println!("expr {:?}", expr);
@@ -234,6 +310,7 @@ impl Engine {
                     _ => Err(()),
                 }
             }
+            Expr::Dot(ref lhs, ref rhs) => self.get_dot_val(scope, lhs, rhs),
             Expr::FnCall(ref fn_name, ref args) => {
                 self.call_fn(fn_name.to_owned(), vec![&mut testv])
             }
