@@ -343,6 +343,90 @@ impl Engine {
     fn eval_stmt(&self, scope: &mut Scope, stmt: &Statment) -> Result<Box<Any>, ()> {
         match *stmt {
             Statment::Expr(ref e) => self.evaluate_express(scope, e),
+            Statment::Block(ref b) => {
+                let prev_len = scope.len();
+                let mut last_result: Result<Box<Any>, ()> = Ok(Box::new(()));
+
+                for s in b.iter() {
+                    last_result = self.eval_stmt(scope, s);
+                    if let Err(x) = last_result {
+                        last_result = Err(x);
+                        break;
+                    }
+                }
+
+                while scope.len() > prev_len {
+                    scope.pop();
+                }
+
+                last_result
+            }
+            Statment::If(ref guard, ref body) => {
+                let guard_result = self.evaluate_express(scope, guard)?;
+                match guard_result.downcast::<bool>() {
+                    Ok(g) => {
+                        if *g {
+                            self.eval_stmt(scope, body)
+                        } else {
+                            Ok(Box::new(()))
+                        }
+                    }
+                    Err(_) => Err(()),
+                }
+            }
+            Statment::IfElse(ref guard, ref body, ref else_body) => {
+                let guard_result = self.evaluate_express(scope, guard)?;
+                match guard_result.downcast::<bool>() {
+                    Ok(g) => {
+                        if *g {
+                            self.eval_stmt(scope, body)
+                        } else {
+                            self.eval_stmt(scope, else_body)
+                        }
+                    }
+                    Err(_) => Err(()),
+                }
+            }
+            Statment::While(ref guard, ref body) => loop {
+                let guard_result = self.evaluate_express(scope, guard)?;
+                match guard_result.downcast::<bool>() {
+                    Ok(g) => {
+                        if *g {
+                            match self.eval_stmt(scope, body) {
+                                Err(()) => return Ok(Box::new(())),//It couldn't support break, since err type is deleted 
+                                Err(x) => return Err(x),
+                                _ => (),
+                            }
+                        } else {
+                            return Ok(Box::new(()));
+                        }
+                    }
+                    Err(_) => return Err(()),
+                }
+            },
+            Statment::Loop(ref body) => loop {
+                match self.eval_stmt(scope, body) {
+                    Err(()) => return Ok(Box::new(())),//same as while
+                    Err(x) => return Err(x),
+                    _ => (),
+                }
+            },
+            Statment::Break => Err(()),//Err(EvalAltResult::LoopBreak) not supported 
+            Statment::Return => Ok(Box::new(())),//return need to be fixed
+            Statment::ReturnWithVal(ref a) => {
+                let result = self.evaluate_express(scope, a)?;
+                Ok(result)
+            }
+            Statment::Var(ref name, ref init) => {
+                match *init {
+                    Some(ref v) => {
+                        let i = self.evaluate_express(scope, v)?;
+                        scope.push((name.clone(), i));
+                    }
+                    None => scope.push((name.clone(), Box::new(()))),
+                };
+                Ok(Box::new(()))
+            }
             _ => Err(()),
         }
     }
