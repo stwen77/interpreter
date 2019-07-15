@@ -2,7 +2,9 @@ use super::any::{Any, AnyExt};
 use super::parser::{parse, Expr, FnDef, Statment};
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::ops::{Add, BitAnd, BitOr, BitXor, Deref, Div, Mul, Neg, Rem, Shl, Shr, Sub};
 use std::sync::Arc;
+
 #[derive(Clone)]
 pub struct Engine {
     pub functions: HashMap<FnSpec, Arc<FnIntExt>>,
@@ -50,37 +52,12 @@ impl Engine {
         return Ok(Box::new(0));
     }
 
-    pub fn register_fn<P, Q, R, FN, RET>(&mut self, name: &str, f: FN)
-    where
-        FN: Fn(P, Q, R) -> RET + 'static,
-        RET: Any,
-        P: Any + Clone,
-        Q: Any + Clone,
-        R: Any + Clone,
-    {
-        let fun = move |mut args: Vec<&mut Any>| {
-            let mut drain = args.drain(..);
-            let P = ((*drain.next().unwrap()).downcast_mut() as Option<&mut P>).ok_or(())?;
-            let Q = ((*drain.next().unwrap()).downcast_mut() as Option<&mut Q>).ok_or(())?;
-            let R = ((*drain.next().unwrap()).downcast_mut() as Option<&mut R>).ok_or(())?;
-
-            Ok(Box::new(f((Clone::clone)(P), (Clone::clone)(Q), (Clone::clone)(R))) as Box<Any>)
-        };
-        self.register_fn_raw(
-            name.to_owned(),
-            Some(vec![
-                TypeId::of::<P>(),
-                TypeId::of::<Q>(),
-                TypeId::of::<R>(),
-            ]),
-            Box::new(fun),
-        );
-    }
     pub fn register_fn_raw(&mut self, ident: String, args: Option<Vec<TypeId>>, f: Box<FnAny>) {
         let spec = FnSpec { id: ident, args };
 
         self.functions.insert(spec, Arc::new(FnIntExt::Ext(f)));
     }
+
     fn search_scope<'a, F, T>(scope: &'a mut Scope, id: &str, map: F) -> Result<(usize, T), ()>
     where
         F: FnOnce(&'a mut Any) -> Result<T, ()>,
@@ -213,7 +190,8 @@ impl Engine {
 
         match *dot_rhs {
             Expr::FnCall(ref fn_name, ref args) => {
-                let mut args: Vec<Box<Any>> = args.iter()
+                let mut args: Vec<Box<Any>> = args
+                    .iter()
                     .map(|arg| self.evaluate_express(scope, arg))
                     .collect::<Result<Vec<_>, _>>()?;
                 let args = once(this_ptr)
@@ -393,7 +371,7 @@ impl Engine {
                     Ok(g) => {
                         if *g {
                             match self.eval_stmt(scope, body) {
-                                Err(()) => return Ok(Box::new(())),//It couldn't support break, since err type is deleted 
+                                Err(()) => return Ok(Box::new(())), //It couldn't support break, since err type is deleted
                                 Err(x) => return Err(x),
                                 _ => (),
                             }
@@ -406,13 +384,13 @@ impl Engine {
             },
             Statment::Loop(ref body) => loop {
                 match self.eval_stmt(scope, body) {
-                    Err(()) => return Ok(Box::new(())),//same as while
+                    Err(()) => return Ok(Box::new(())), //same as while
                     Err(x) => return Err(x),
                     _ => (),
                 }
             },
-            Statment::Break => Err(()),//Err(EvalAltResult::LoopBreak) not supported 
-            Statment::Return => Ok(Box::new(())),//return need to be fixed
+            Statment::Break => Err(()), //Err(EvalAltResult::LoopBreak) not supported
+            Statment::Return => Ok(Box::new(())), //return need to be fixed
             Statment::ReturnWithVal(ref a) => {
                 let result = self.evaluate_express(scope, a)?;
                 Ok(result)
@@ -477,5 +455,180 @@ impl Engine {
             }
             Err(_) => Err(()),
         }
+    }
+    pub fn register_default_lib(engine: &mut Engine) {
+        macro_rules! reg_op {
+            ($engine:expr, $x:expr, $op:expr, $( $y:ty ),*) => (
+                $(
+                    $engine.register_fn($x, ($op as fn(x: $y, y: $y)->$y));
+                )*
+            )
+        }
+
+        fn add<T: Add>(x: T, y: T) -> <T as Add>::Output {
+            x + y
+        }
+        fn sub<T: Sub>(x: T, y: T) -> <T as Sub>::Output {
+            x - y
+        }
+        fn mul<T: Mul>(x: T, y: T) -> <T as Mul>::Output {
+            x * y
+        }
+        fn div<T: Div>(x: T, y: T) -> <T as Div>::Output {
+            x / y
+        }
+        fn neg<T: Neg>(x: T) -> <T as Neg>::Output {
+            -x
+        }
+        fn lt<T: PartialOrd>(x: T, y: T) -> bool {
+            x < y
+        }
+        fn lte<T: PartialOrd>(x: T, y: T) -> bool {
+            x <= y
+        }
+        fn gt<T: PartialOrd>(x: T, y: T) -> bool {
+            x > y
+        }
+        fn gte<T: PartialOrd>(x: T, y: T) -> bool {
+            x >= y
+        }
+        fn eq<T: PartialEq>(x: T, y: T) -> bool {
+            x == y
+        }
+        fn ne<T: PartialEq>(x: T, y: T) -> bool {
+            x != y
+        }
+        fn and(x: bool, y: bool) -> bool {
+            x && y
+        }
+        fn or(x: bool, y: bool) -> bool {
+            x || y
+        }
+        fn not(x: bool) -> bool {
+            !x
+        }
+        fn concat(x: String, y: String) -> String {
+            x + &y
+        }
+        fn binary_and<T: BitAnd>(x: T, y: T) -> <T as BitAnd>::Output {
+            x & y
+        }
+        fn binary_or<T: BitOr>(x: T, y: T) -> <T as BitOr>::Output {
+            x | y
+        }
+        fn binary_xor<T: BitXor>(x: T, y: T) -> <T as BitXor>::Output {
+            x ^ y
+        }
+        fn left_shift<T: Shl<T>>(x: T, y: T) -> <T as Shl<T>>::Output {
+            x.shl(y)
+        }
+        fn right_shift<T: Shr<T>>(x: T, y: T) -> <T as Shr<T>>::Output {
+            x.shr(y)
+        }
+        fn modulo<T: Rem<T>>(x: T, y: T) -> <T as Rem<T>>::Output {
+            x % y
+        }
+        fn pow_i64_i64(x: i64, y: i64) -> i64 {
+            x.pow(y as u32)
+        }
+        fn pow_f64_f64(x: f64, y: f64) -> f64 {
+            x.powf(y)
+        }
+        fn pow_f64_i64(x: f64, y: i64) -> f64 {
+            x.powi(y as i32)
+        }
+        fn unit_eq(a: (), b: ()) -> bool {
+            true
+        }
+
+        //reg_op!(engine, "+", add, i32, i64, u32, u64, f32, f64);
+    }
+}
+
+pub trait RegisterFn<FN, ARGS, RET> {
+    fn register_fn(&mut self, name: &str, f: FN);
+}
+
+impl<P, Q, R, RET, FN> RegisterFn<FN, (P, Q, R), RET> for Engine
+where
+    FN: Fn(P, Q, R) -> RET + 'static,
+    RET: Any,
+    P: Any + Clone,
+    Q: Any + Clone,
+    R: Any + Clone,
+{
+    fn register_fn(&mut self, name: &str, f: FN) {
+        let fun = move |mut args: Vec<&mut Any>| {
+            let mut drain = args.drain(..);
+            let P = ((*drain.next().unwrap()).downcast_mut() as Option<&mut P>).ok_or(())?;
+            let Q = ((*drain.next().unwrap()).downcast_mut() as Option<&mut Q>).ok_or(())?;
+            let R = ((*drain.next().unwrap()).downcast_mut() as Option<&mut R>).ok_or(())?;
+
+            Ok(Box::new(f((Clone::clone)(P), (Clone::clone)(Q), (Clone::clone)(R))) as Box<Any>)
+        };
+        self.register_fn_raw(
+            name.to_owned(),
+            Some(vec![
+                TypeId::of::<P>(),
+                TypeId::of::<Q>(),
+                TypeId::of::<R>(),
+            ]),
+            Box::new(fun),
+        );
+    }
+}
+impl<P, Q, RET, FN> RegisterFn<FN, (P, Q), RET> for Engine
+where
+    FN: Fn(P, Q) -> RET + 'static,
+    RET: Any,
+    P: Any + Clone,
+    Q: Any + Clone,
+{
+    fn register_fn(&mut self, name: &str, f: FN) {
+        let fun = move |mut args: Vec<&mut Any>| {
+            let mut drain = args.drain(..);
+            let P = ((*drain.next().unwrap()).downcast_mut() as Option<&mut P>).ok_or(())?;
+            let Q = ((*drain.next().unwrap()).downcast_mut() as Option<&mut Q>).ok_or(())?;
+
+            Ok(Box::new(f((Clone::clone)(P), (Clone::clone)(Q))) as Box<Any>)
+        };
+        self.register_fn_raw(
+            name.to_owned(),
+            Some(vec![TypeId::of::<P>(), TypeId::of::<Q>()]),
+            Box::new(fun),
+        );
+    }
+}
+impl<P, RET, FN> RegisterFn<FN, (P,), RET> for Engine
+where
+    FN: Fn(P) -> RET + 'static,
+    RET: Any,
+    P: Any + Clone,
+{
+    fn register_fn(&mut self, name: &str, f: FN) {
+        let fun = move |mut args: Vec<&mut Any>| {
+            let mut drain = args.drain(..);
+            let P = ((*drain.next().unwrap()).downcast_mut() as Option<&mut P>).ok_or(())?;
+
+            Ok(Box::new(f((Clone::clone)(P))) as Box<Any>)
+        };
+        self.register_fn_raw(
+            name.to_owned(),
+            Some(vec![TypeId::of::<P>()]),
+            Box::new(fun),
+        );
+    }
+}
+impl<FN, RET> RegisterFn<FN, (), RET> for Engine
+where
+    FN: Fn() -> RET + 'static,
+    RET: Any,
+{
+    fn register_fn(&mut self, name: &str, f: FN) {
+        let fun = move |mut args: Vec<&mut Any>| {
+            let mut drain = args.drain(..);
+            Ok(Box::new(f()) as Box<Any>)
+        };
+        self.register_fn_raw(name.to_owned(), Some(vec![]), Box::new(fun));
     }
 }
