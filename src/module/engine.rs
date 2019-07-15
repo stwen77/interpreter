@@ -321,9 +321,22 @@ impl Engine {
                 }
             }
             Expr::Dot(ref lhs, ref rhs) => self.get_dot_val(scope, lhs, rhs),
+            Expr::Array(ref contents) => {
+                let mut arr = Vec::new();
+
+                for item in &(*contents) {
+                    let arg = self.evaluate_express(scope, item)?;
+                    arr.push(arg);
+                }
+
+                Ok(Box::new(arr))
+            }
             Expr::FnCall(ref fn_name, ref args) => {
                 self.call_fn(fn_name.to_owned(), vec![&mut testv])
             }
+            Expr::True => Ok(Box::new(true)),
+            Expr::False => Ok(Box::new(false)),
+            Expr::Unit => Ok(Box::new(())),
             _ => Err(()),
         }
     }
