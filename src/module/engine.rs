@@ -34,6 +34,9 @@ impl Engine {
             functions: HashMap::new(),
             types: HashMap::new(),
         };
+
+        Engine::register_default_lib(&mut engine);
+        
         return engine;
     }
 
@@ -464,7 +467,21 @@ impl Engine {
                 )*
             )
         }
+        macro_rules! reg_un {
+            ($engine:expr, $x:expr, $op:expr, $( $y:ty ),*) => (
+                $(
+                    $engine.register_fn($x, ($op as fn(x: $y)->$y));
+                )*
+            )
+        }
 
+        macro_rules! reg_cmp {
+            ($engine:expr, $x:expr, $op:expr, $( $y:ty ),*) => (
+                $(
+                    $engine.register_fn($x, ($op as fn(x: $y, y: $y)->bool));
+                )*
+            )
+        }
         fn add<T: Add>(x: T, y: T) -> <T as Add>::Output {
             x + y
         }
@@ -541,7 +558,37 @@ impl Engine {
             true
         }
 
-        //reg_op!(engine, "+", add, i32, i64, u32, u64, f32, f64);
+        reg_op!(engine, "+", add, i32, i64, u32, u64, f32, f64);
+        reg_op!(engine, "-", sub, i32, i64, u32, u64, f32, f64);
+        reg_op!(engine, "*", mul, i32, i64, u32, u64, f32, f64);
+        reg_op!(engine, "/", div, i32, i64, u32, u64, f32, f64);
+
+        reg_cmp!(engine, "<", lt, i32, i64, u32, u64, String, f64);
+        reg_cmp!(engine, "<=", lte, i32, i64, u32, u64, String, f64);
+        reg_cmp!(engine, ">", gt, i32, i64, u32, u64, String, f64);
+        reg_cmp!(engine, ">=", gte, i32, i64, u32, u64, String, f64);
+        reg_cmp!(engine, "==", eq, i32, i64, u32, u64, bool, String, f64);
+        reg_cmp!(engine, "!=", ne, i32, i64, u32, u64, bool, String, f64);
+
+        reg_op!(engine, "||", or, bool);
+        reg_op!(engine, "&&", and, bool);
+        reg_op!(engine, "|", binary_or, i32, i64, u32, u64);
+        reg_op!(engine, "|", or, bool);
+        reg_op!(engine, "&", binary_and, i32, i64, u32, u64);
+        reg_op!(engine, "&", and, bool);
+        reg_op!(engine, "^", binary_xor, i32, i64, u32, u64);
+        reg_op!(engine, "<<", left_shift, i32, i64, u32, u64);
+        reg_op!(engine, ">>", right_shift, i32, i64, u32, u64);
+        reg_op!(engine, "%", modulo, i32, i64, u32, u64);
+        engine.register_fn("~", pow_i64_i64);
+        engine.register_fn("~", pow_f64_f64);
+        engine.register_fn("~", pow_f64_i64);
+
+        reg_un!(engine, "-", neg, i32, i64, f32, f64);
+        reg_un!(engine, "!", not, bool);
+
+        engine.register_fn("+", concat);
+        engine.register_fn("==", unit_eq);
     }
 }
 
